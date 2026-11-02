@@ -2,5 +2,6 @@ node_modules/
 dist/
 coverage/
 .pi/
+.agents/memory/
 *.log
 .DS_Store
