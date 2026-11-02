@@ -18,14 +18,12 @@ interface FakeOptions {
 
 interface FakeContext {
 	ctx: ExtensionContext;
-	statuses: string[];
 	notifications: string[];
 	/** System prompts sent to the model, in call order. */
 	calls: number;
 }
 
 function fakeContext(options: FakeOptions): FakeContext {
-	const statuses: string[] = [];
 	const notifications: string[] = [];
 	const fake = { calls: 0 };
 	const modelRegistry = {
@@ -42,7 +40,6 @@ function fakeContext(options: FakeOptions): FakeContext {
 		cwd: options.cwd,
 		isProjectTrusted: () => true,
 		ui: {
-			setStatus: (_id: string, text?: string) => statuses.push(text ?? ""),
 			notify: (text: string) => notifications.push(text),
 		},
 		sessionManager: {
@@ -54,7 +51,6 @@ function fakeContext(options: FakeOptions): FakeContext {
 
 	return {
 		ctx,
-		statuses,
 		notifications,
 		get calls() {
 			return fake.calls;

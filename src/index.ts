@@ -13,7 +13,7 @@
  */
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { registerMemoryCommand } from "./command.ts";
 import type { MemoryEntry } from "./memory.ts";
@@ -39,19 +39,10 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 	/** Rendered block for the prompt being answered, so later requests reuse it verbatim. */
 	let rendered: { signature: string; block?: string } | undefined;
 
-	const setStatus = (ctx: ExtensionContext): void => {
-		try {
-			ctx.ui.setStatus("memory", runtime.statusText());
-		} catch {
-			// Session teardown; the status line no longer matters.
-		}
-	};
-
 	pi.on("session_start", async (_event, ctx) => {
 		runtime.init(ctx);
 		prefetch = undefined;
 		rendered = undefined;
-		setStatus(ctx);
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {
@@ -114,10 +105,8 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 				const outcome = await runtime.extract(ctx);
 				if (outcome.written.length > 0) {
 					ctx.ui.notify(`memory: saved ${outcome.written.join(", ")}`, "info");
-					setStatus(ctx);
 				}
 				runtime.refresh();
-				setStatus(ctx);
 
 				const consolidate = runtime.config.consolidate;
 				if (

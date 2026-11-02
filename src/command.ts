@@ -160,7 +160,6 @@ export function registerMemoryCommand(pi: ExtensionAPI, runtime: MemoryRuntime):
 						return;
 					}
 					ctx.ui.notify(`Saved ${result.path}`, "info");
-					ctx.ui.setStatus("memory", runtime.statusText());
 					return;
 				}
 
@@ -183,7 +182,6 @@ export function registerMemoryCommand(pi: ExtensionAPI, runtime: MemoryRuntime):
 						removed ? `Deleted ${entry.filename}` : `Could not delete ${entry.filename}`,
 						removed ? "info" : "error",
 					);
-					ctx.ui.setStatus("memory", runtime.statusText());
 					return;
 				}
 
@@ -209,7 +207,6 @@ export function registerMemoryCommand(pi: ExtensionAPI, runtime: MemoryRuntime):
 						`Merged: ${result.written.join(", ") || "none"}; removed: ${result.removed.join(", ") || "none"}`,
 						"info",
 					);
-					ctx.ui.setStatus("memory", runtime.statusText());
 					return;
 				}
 
@@ -236,7 +233,6 @@ export function registerMemoryCommand(pi: ExtensionAPI, runtime: MemoryRuntime):
 
 				case "reload": {
 					runtime.init(ctx);
-					ctx.ui.setStatus("memory", runtime.statusText());
 					ctx.ui.notify(`Reloaded: ${runtime.statusText()}`, "info");
 					return;
 				}

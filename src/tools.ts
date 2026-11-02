@@ -56,7 +56,7 @@ export function registerMemoryTools(pi: ExtensionAPI, runtime: MemoryRuntime): v
 		],
 		parameters: SaveParams,
 
-		async execute(_toolCallId, params: SaveInput, _signal, _onUpdate, ctx) {
+		async execute(_toolCallId, params: SaveInput, _signal, _onUpdate) {
 			const type = params.type as MemoryType;
 			const outcome = runtime.save(
 				{
@@ -67,7 +67,6 @@ export function registerMemoryTools(pi: ExtensionAPI, runtime: MemoryRuntime): v
 				},
 				{ scope: params.scope, overwrite: params.overwrite },
 			);
-			ctx.ui.setStatus("memory", runtime.statusText());
 
 			if (!outcome.ok) {
 				return {
@@ -98,7 +97,7 @@ export function registerMemoryTools(pi: ExtensionAPI, runtime: MemoryRuntime): v
 		],
 		parameters: SearchParams,
 
-		async execute(_toolCallId, params: SearchInput, _signal, _onUpdate, ctx) {
+		async execute(_toolCallId, params: SearchInput, _signal, _onUpdate) {
 			runtime.refresh();
 			const scope = params.scope;
 			const entries = runtime.entries.filter((entry) => !scope || entry.scope === scope);
@@ -131,7 +130,6 @@ export function registerMemoryTools(pi: ExtensionAPI, runtime: MemoryRuntime): v
 					details: { count: 0 },
 				};
 			}
-			ctx.ui.setStatus("memory", runtime.statusText());
 			return {
 				content: [
 					{

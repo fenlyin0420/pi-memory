@@ -91,8 +91,6 @@ export class MemoryRuntime {
 	private extractingSince = 0;
 	lastExtractAt = 0;
 	lastConsolidateAt = 0;
-	private warnedModels = new Set<string>();
-	private extractWarningsShown = false;
 
 	init(ctx: ExtensionContext): void {
 		this.cwd = ctx.cwd;
@@ -100,8 +98,6 @@ export class MemoryRuntime {
 		this.config = loaded.config;
 		this.warnings = loaded.warnings;
 		this.configFiles = loaded.files;
-		this.warnedModels.clear();
-		this.extractWarningsShown = false;
 
 		this.globalScope = { name: "global", dir: this.config.store.global };
 		this.projectRoot = findProjectRoot(ctx.cwd);
@@ -275,7 +271,6 @@ export class MemoryRuntime {
 			});
 			if (!outcome.text) {
 				debug(`extract: model call returned nothing (${outcome.error})`);
-				this.noteModelProblem(ctx, outcome.error);
 				return { written: [], reason: outcome.error };
 			}
 			debug(`extract: model reply ${outcome.text.slice(0, 200)}`);
@@ -429,14 +424,6 @@ export class MemoryRuntime {
 
 	ensureProjectDir(): void {
 		if (this.projectScope) ensureScopeDir(this.projectScope);
-	}
-
-	private noteModelProblem(ctx: ExtensionContext, reason?: string): void {
-		if (!reason || this.warnedModels.has(reason)) return;
-		this.warnedModels.add(reason);
-		if (this.extractWarningsShown) return;
-		this.extractWarningsShown = true;
-		ctx.ui.setStatus("memory", `memory: extraction failed (${reason})`);
 	}
 
 	/** Files in the project scope, used for tests and diagnostics. */
