@@ -1,6 +1,6 @@
 {
 	"name": "@fenlyin/pi-memory",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "Pi extension. A durable memory layer that survives compaction and sessions: markdown store, MEMORY.md catalog in the system prompt, relevant memories recalled per request, new facts extracted after each run.",
 	"keywords": [
 		"pi-package",

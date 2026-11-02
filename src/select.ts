@@ -20,6 +20,13 @@ export interface SelectOptions {
 	useModel: boolean;
 }
 
+/**
+ * Budget for the catalog shown to the selecting model. It has to cover the whole store:
+ * a catalog cut short silently hides the memories that fall past the cut, and the model
+ * then picks from a subset without knowing it.
+ */
+const SELECT_CATALOG_MAX_BYTES = 12_000;
+
 const SELECT_SYSTEM = [
 	"You choose which saved memories help answer a request from a coding agent.",
 	"Reply with a JSON array of indices and nothing else, for example [0,3].",
@@ -49,7 +56,7 @@ async function modelSelect(
 	const catalog = entries.map((entry, index) => `${index}: ${entry.name} — ${entry.description}`).join("\n");
 	const user = [
 		`Request:\n${truncateBytes(options.prompt, 2_000)}`,
-		`\nMemories:\n${truncateBytes(catalog, 4_000)}`,
+		`\nMemories:\n${truncateBytes(catalog, SELECT_CATALOG_MAX_BYTES)}`,
 		`\nReturn at most ${options.maxItems} indices.`,
 	].join("\n");
 

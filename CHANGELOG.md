@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- The selector sees the whole catalog: its budget grew from 4 KB to 12 KB, so a store of ~80 memories no longer loses the tail of the list silently.
+
 ## 0.2.0
 
 - Memory frontmatter is flat: `name`, `description`, `type`. The nested `metadata.type` block is gone from the writer and still read from existing files.
