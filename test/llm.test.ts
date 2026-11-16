@@ -52,6 +52,13 @@ describe("complete", () => {
 		expect(fake.options?.sessionId).toBe("session-1");
 	});
 
+	it("keeps the side query out of the conversation's server-side thread", async () => {
+		const fake = fakeContext({ text: "[0]" });
+		await complete(fake.ctx, "opencode-go/deepseek-v4.1-flash", request);
+
+		expect(fake.options?.disableContinuation).toBe(true);
+	});
+
 	it("reports an unknown model instead of calling the provider", async () => {
 		const fake = fakeContext({ knownModel: false });
 		const outcome = await complete(fake.ctx, "opencode-go/missing", request);

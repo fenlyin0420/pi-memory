@@ -3,6 +3,7 @@
 ## 0.2.2
 
 - Model side queries carry the session id. Providers that route per conversation, OpenCode among them, rejected them with `400 MissingSessionID`, so recall always fell back to keyword matching and extraction never wrote a memory.
+- The same queries opt out of provider-side conversation threads (`disableContinuation`), so they cannot break the continuation the real turn resumes from.
 
 ## 0.2.1
 

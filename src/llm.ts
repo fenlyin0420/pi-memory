@@ -62,6 +62,10 @@ export async function complete(
 				// OpenCode routes per conversation and rejects a request without this header with
 				// 400 MissingSessionID; a side query that fails leaves recall and extraction dead.
 				sessionId: ctx.sessionManager.getSessionId(),
+				// The same id keys Anthropic's server-side message threads. A side query must not
+				// join the conversation's thread: doing so drops the prefix the real turn continues
+				// from, so every turn after a memory call resends the full prompt.
+				disableContinuation: true,
 				signal: AbortSignal.timeout(request.timeoutMs),
 			},
 		);
