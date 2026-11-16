@@ -45,6 +45,7 @@ function fakeContext(options: FakeOptions): FakeContext {
 		sessionManager: {
 			getBranch: () => (options.branch ?? []).map((message) => ({ type: "message", message })),
 			getHeader: () => options.header ?? {},
+			getSessionId: () => "session-1",
 		},
 		modelRegistry,
 	} as unknown as ExtensionContext;

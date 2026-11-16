@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Model side queries carry the session id. Providers that route per conversation, OpenCode among them, rejected them with `400 MissingSessionID`, so recall always fell back to keyword matching and extraction never wrote a memory.
+
 ## 0.2.1
 
 - The selector sees the whole catalog: its budget grew from 4 KB to 12 KB, so a store of ~80 memories no longer loses the tail of the list silently.

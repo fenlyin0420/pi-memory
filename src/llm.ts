@@ -59,6 +59,9 @@ export async function complete(
 			},
 			{
 				maxTokens: request.maxTokens,
+				// OpenCode routes per conversation and rejects a request without this header with
+				// 400 MissingSessionID; a side query that fails leaves recall and extraction dead.
+				sessionId: ctx.sessionManager.getSessionId(),
 				signal: AbortSignal.timeout(request.timeoutMs),
 			},
 		);
