@@ -94,6 +94,16 @@ describe("recall block", () => {
 		expect(block).not.toContain("b.md");
 	});
 
+	it("keeps the first memory even when the total budget is far too small", () => {
+		const block = renderRecallBlock(
+			[entry({ filename: "a.md", body: "x".repeat(400) }), entry({ filename: "b.md", body: "y".repeat(400) })],
+			{ maxFileBytes: 400, maxTotalBytes: 100 },
+		);
+		expect(block).toContain("a.md");
+		expect(block).toContain("x".repeat(50));
+		expect(block).not.toContain("b.md");
+	});
+
 	it("returns nothing for an empty list", () => {
 		expect(renderRecallBlock([], { maxFileBytes: 100, maxTotalBytes: 100 })).toBeUndefined();
 	});

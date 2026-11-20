@@ -34,6 +34,23 @@ describe("parseCandidates", () => {
 		expect(parseCandidates('{"name":"x"}')).toEqual([]);
 		expect(parseCandidates("nothing here")).toEqual([]);
 	});
+
+	it("refuses a candidate whose body collapsed into a repeated filler token", () => {
+		const body = Array.from({ length: 30 }, (_, index) => `推理服务里里 serving 里里 this 里里 step${index}`).join(
+			" ",
+		);
+		expect(parseCandidates(JSON.stringify([{ name: "bad", description: "长时间冒烟测试", body }]))).toEqual([]);
+	});
+
+	it("keeps a body that names its subject an ordinary number of times", () => {
+		const body = [
+			"冒烟测试会拉起真模型，会话端口因此被占。",
+			"起之前先问：这一步最坏会发生什么，能不能只读验证。",
+			"收尾不要靠 pid 文件，用测试前后的 pgrep 差集核对孤儿进程。",
+			"同样的道理适用于任何共享资源：显存、端口、生产数据。",
+		].join("");
+		expect(parseCandidates(JSON.stringify([{ name: "smoke", description: "冒烟测试纪律", body }]))).toHaveLength(1);
+	});
 });
 
 describe("dialogueExcerpt", () => {

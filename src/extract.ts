@@ -7,6 +7,7 @@
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { MemoryType } from "./config.ts";
+import { debug } from "./debug.ts";
 import type { JsonReply } from "./llm.ts";
 import { parseJsonReply } from "./llm.ts";
 import type { MemoryDraft, ScopeName } from "./memory.ts";
@@ -57,6 +58,32 @@ export function buildExtractionPrompt(input: ExtractionPromptInput): { system: s
 
 const TYPES = new Set<MemoryType>(["user", "feedback", "project", "reference"]);
 
+/**
+ * A candidate whose prose collapsed into a loop. Cheap models occasionally repeat a filler
+ * token instead of writing ("推理服务里里 serving 里里 this 里里 agent 里里 …"); the JSON still
+ * parses, so the garbage lands in the store and is recalled on every later turn. Refusing it
+ * here is the only place that costs nothing.
+ */
+const DEGENERATE_MIN_TOKENS = 20;
+const DEGENERATE_REPEATS = 5;
+const DEGENERATE_SHARE = 0.05;
+
+/**
+ * True when one word or CJK bigram takes up an implausible share of the text. A real memory
+ * repeats its subject a handful of times in a few hundred tokens, far below the threshold.
+ */
+export function looksDegenerate(text: string): boolean {
+	const tokens = text.toLowerCase().match(/\p{Script=Han}{2}|[a-z][a-z0-9'’_-]*/gu) ?? [];
+	if (tokens.length < DEGENERATE_MIN_TOKENS) return false;
+
+	const counts = new Map<string, number>();
+	for (const token of tokens) counts.set(token, (counts.get(token) ?? 0) + 1);
+	for (const count of counts.values()) {
+		if (count >= DEGENERATE_REPEATS && count / tokens.length >= DEGENERATE_SHARE) return true;
+	}
+	return false;
+}
+
 function asObject(value: JsonReply): { [key: string]: JsonReply } | undefined {
 	return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
 }
@@ -79,13 +106,18 @@ export function parseCandidates(reply: string): Candidate[] {
 		if (!name || !description) continue;
 		const rawType = asString(object.type).toLowerCase() as MemoryType;
 		const scope = asString(object.scope) === "project" ? "project" : "global";
-		candidates.push({
+		const candidate: Candidate = {
 			name,
 			description: truncateText(description, 200),
 			type: TYPES.has(rawType) ? rawType : "reference",
 			body: truncateBytes(body || description, 2_000),
 			scope,
-		});
+		};
+		if (looksDegenerate(candidate.body) || looksDegenerate(candidate.description)) {
+			debug(`extract: refused degenerate candidate ${candidate.name}`);
+			continue;
+		}
+		candidates.push(candidate);
 	}
 	return candidates;
 }

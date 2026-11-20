@@ -16,7 +16,9 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { registerMemoryCommand } from "./command.ts";
+import { debug } from "./debug.ts";
 import type { MemoryEntry } from "./memory.ts";
+import { truncateText } from "./memory.ts";
 import { lastUserText, promptSignature, renderCatalogSection, renderRecallBlock } from "./prompt.ts";
 import { MemoryRuntime } from "./runtime.ts";
 import { keywordSelect } from "./select.ts";
@@ -27,8 +29,32 @@ interface RecallReport {
 	lines?: string[];
 }
 
+/** One report line stays short so the session entry reads like an index, not a second catalog. */
+const RECALL_LINE_MAX = 120;
+
 function recallMessage(text: string): AgentMessage {
 	return { role: "user", content: text, timestamp: Date.now() } as AgentMessage;
+}
+
+/** `filename - description`, one line per recalled memory. */
+function recallLine(entry: MemoryEntry): string {
+	return truncateText(`${entry.filename} - ${entry.description || "(no description)"}`, RECALL_LINE_MAX);
+}
+
+/**
+ * Record what recall did for one prompt. The stored entry is the audit trail: the block lives in
+ * the transcript for one request, so without this nobody can tell afterwards what was injected.
+ */
+function reportRecall(pi: ExtensionAPI, signature: string, memories: MemoryEntry[], block: string | undefined): void {
+	const files = memories.map((entry) => entry.filename);
+	debug(
+		`recall: signature=${signature} count=${memories.length} bytes=${block ? Buffer.byteLength(block, "utf8") : 0} files=${files.length > 0 ? files.join(", ") : "-"}`,
+	);
+
+	pi.appendEntry("memory-report", {
+		title: memories.length > 0 ? `memory recall · ${memories.length}` : "memory recall · none",
+		lines: memories.length > 0 ? memories.map(recallLine) : ["(nothing relevant)"],
+	} satisfies RecallReport);
 }
 
 export default function memoryExtension(pi: ExtensionAPI): void {
@@ -60,7 +86,13 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 
 		const recall = runtime.config.recall;
 		const text = event.messageType === "user" ? (event.prompt ?? "").trim() : "";
-		if (!recall.enabled || text.length < recall.minPromptChars) {
+		if (!recall.enabled) {
+			debug("recall: disabled");
+			prefetch = undefined;
+			return;
+		}
+		if (text.length < recall.minPromptChars) {
+			debug(`recall: prompt is ${text.length} chars, below minPromptChars=${recall.minPromptChars}`);
 			prefetch = undefined;
 			return;
 		}
@@ -75,13 +107,25 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 
 	pi.on("context", async (event) => {
 		const recall = runtime.config.recall;
-		if (!recall.enabled) return;
+		if (!recall.enabled) {
+			debug("recall: disabled");
+			return;
+		}
 
 		const prompt = lastUserText(event.messages);
-		if (!prompt || prompt.length < recall.minPromptChars) return;
+		if (!prompt) {
+			debug("recall: no user prompt in context");
+			return;
+		}
+		if (prompt.length < recall.minPromptChars) {
+			debug(`recall: prompt is ${prompt.length} chars, below minPromptChars=${recall.minPromptChars}`);
+			return;
+		}
 		const signature = promptSignature(prompt);
 
 		if (rendered?.signature === signature) {
+			// Cached: this branch runs on every tool loop of the same prompt, so it logs and appends
+			// nothing. One report per signature is the whole point of the entry.
 			return rendered.block ? { messages: [...event.messages, recallMessage(rendered.block)] } : undefined;
 		}
 
@@ -94,6 +138,7 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 			maxTotalBytes: recall.maxTotalBytes,
 		});
 		rendered = { signature, block };
+		reportRecall(pi, signature, memories, block);
 		return block ? { messages: [...event.messages, recallMessage(block)] } : undefined;
 	});
 

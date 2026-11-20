@@ -114,13 +114,19 @@ export function renderRecallBlock(memories: MemoryEntry[], options: RecallOption
 
 	let budget = options.maxTotalBytes - Buffer.byteLength(header.join("\n"), "utf8") - footer.length;
 	const sections: string[] = [];
-	for (const memory of memories) {
+	for (let index = 0; index < memories.length; index++) {
+		const memory = memories[index];
 		const heading = `## ${memory.name} (${memory.type}) — ${memory.path}`;
-		const body = truncateBytes(memory.body, Math.min(options.maxFileBytes, Math.max(0, budget)));
+		// The caller passes the entries already ranked, so the first one is the best thing this
+		// request can be told. Giving it its own allowance means a tight maxTotalBytes spends the
+		// block on the weaker tail as before instead of cutting away the entry that mattered; the
+		// block may then exceed the budget, which is the point.
+		const allowance = index === 0 ? options.maxFileBytes : Math.min(options.maxFileBytes, Math.max(0, budget));
+		const body = truncateBytes(memory.body, allowance);
 		if (!body) break;
 		const section = `${heading}\n${body}`;
 		budget -= Buffer.byteLength(section, "utf8");
-		if (budget < 0) break;
+		if (index > 0 && budget < 0) break;
 		sections.push(section);
 	}
 

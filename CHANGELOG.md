@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- An explicit "nothing is relevant" from the selecting model is now an answer, so recall no longer overrides an empty reply with the keyword fallback and re-injects the memories the model just rejected.
+- The keyword fallback counts name and description hits only, blanks code, URLs, and path tokens out of the prompt, and keeps entries within half of the best score, so one long prompt can no longer drag half the store into the request.
+- Keyword hits are weighed by token rarity (`ln(1 + N/df)`), so a rare word outranks one that half the store shares, and the fallback stays silent when the best candidate does not clearly beat the runner-up. A prompt with no real match used to come back with a whole family of memories that shared one generic word.
+- The top-scoring memory gets its own byte allowance, so a tight `recall.maxTotalBytes` can no longer truncate away the entry that mattered most.
+- Extraction refuses a candidate whose prose collapsed into a repeated filler token (`…里里 serving 里里 this 里里…`), which used to be written to the store and recalled on every later turn.
+- Every recall now appends a `memory-report` session entry and, with `PI_MEMORY_DEBUG`, logs signature, count, bytes, and filenames, so what was injected can be audited afterwards.
+
 ## 0.2.2
 
 - Model side queries carry the session id. Providers that route per conversation, OpenCode among them, rejected them with `400 MissingSessionID`, so recall always fell back to keyword matching and extraction never wrote a memory.
