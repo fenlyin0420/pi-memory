@@ -145,3 +145,5 @@ MIT
 ## Contributing
 
 Issue 与 PR 都欢迎。改动请附带 `npm run check`（typecheck + biome + vitest）与 `npm run smoke`。
+
+`npm install` 会把 `core.hooksPath` 指向 `.githooks`；提交时若 `package.json` 或 `package-lock.json` 有改动，pre-commit 钩子会重算 lock 并一起暂存，发版时不会再留下版本漂移的 lock。

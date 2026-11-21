@@ -28,6 +28,8 @@
 		"format": "biome format --write .",
 		"lint": "biome check --write .",
 		"check": "npm run typecheck && npm run lint && npm test",
+		"hooks": "git config core.hooksPath .githooks",
+		"prepare": "sh -c '[ -d .git ] && git config core.hooksPath .githooks || true'",
 		"smoke": "node scripts/smoke.mjs",
 		"migrate": "node scripts/migrate-frontmatter.mjs"
 	},

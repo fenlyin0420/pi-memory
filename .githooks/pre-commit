@@ -1,0 +1,35 @@
+#!/bin/sh
+# Keep package-lock.json in sync with package.json before every commit.
+#
+# npm rewrites the lock's root package version on any install, so a release that
+# bumps package.json alone leaves the lock dirty forever. Whenever the lock is part
+# of the working state, re-sync it and commit it next to package.json.
+set -e
+
+[ -f package-lock.json ] || exit 0
+
+staged=$(git diff --cached --name-only)
+dirty=$(git diff --name-only)
+
+has() { echo "$1" | grep -qx "$2"; }
+
+# npm reads the working-tree package.json, so a lock synced from it would not match
+# the version that lands in the commit when package.json itself is only half staged.
+if has "$dirty" package.json; then
+	echo "pre-commit: package.json has unstaged changes; stage it so package-lock.json can be synced" >&2
+	exit 1
+fi
+
+if ! has "$staged" package.json && ! has "$staged" package-lock.json && ! has "$dirty" package-lock.json; then
+	exit 0
+fi
+
+if ! npm install --package-lock-only --ignore-scripts --no-audit --no-fund --prefer-offline >/dev/null; then
+	echo "pre-commit: npm install --package-lock-only failed; package-lock.json is out of sync" >&2
+	exit 1
+fi
+
+if ! git diff --quiet -- package-lock.json; then
+	git add package-lock.json
+	echo "pre-commit: package-lock.json synced and staged"
+fi
