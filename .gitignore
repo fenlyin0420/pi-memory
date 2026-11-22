@@ -5,3 +5,5 @@ coverage/
 .agents/memory/
 *.log
 .DS_Store
+.agents/
+*.tgz

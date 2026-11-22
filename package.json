@@ -2,14 +2,16 @@
 	"name": "@fenlyin/pi-memory",
 	"version": "0.2.2",
 	"description": "Pi extension. A durable memory layer that survives compaction and sessions: markdown store, MEMORY.md catalog in the system prompt, relevant memories recalled per request, new facts extracted after each run.",
+	"type": "module",
+	"license": "MIT",
 	"keywords": [
 		"pi-package",
+		"pi",
+		"pi-coding-agent",
 		"pi-extension",
 		"memory"
 	],
-	"type": "module",
-	"license": "MIT",
-	"author": "fenlyin",
+	"author": "fenlyin0420",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/fenlyin0420/pi-memory.git"
@@ -17,9 +19,6 @@
 	"homepage": "https://github.com/fenlyin0420/pi-memory#readme",
 	"bugs": {
 		"url": "https://github.com/fenlyin0420/pi-memory/issues"
-	},
-	"publishConfig": {
-		"access": "public"
 	},
 	"scripts": {
 		"test": "vitest run",
@@ -61,5 +60,8 @@
 		"typebox": "1.3.6",
 		"typescript": "6.0.3",
 		"vitest": "4.1.10"
+	},
+	"publishConfig": {
+		"access": "public"
 	}
 }
