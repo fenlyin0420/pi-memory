@@ -49,7 +49,7 @@ pi -e ./path/to/pi-memory
 正常对话即可。说出稳定偏好、纠正做法、交代项目背景时，一轮结束后自动落盘；想立刻查看：
 
 ```text
-/memory status      # 两个 store 各有多少条、配置文件在哪
+/memory status      # 两个 store 各有多少条、配置文件在哪、上次整理时间
 /memory list 20
 /memory search 缩进
 /memory show tabs-not-spaces
@@ -112,7 +112,9 @@ pi -e ./path/to/pi-memory
     "enabled": false,
     "threshold": 30,
     "minIntervalMs": 86400000,
-    "model": ""
+    "model": "",
+    "timeoutMs": 240000,
+    "maxTokens": 12000
   }
 }
 ```
@@ -122,7 +124,9 @@ pi -e ./path/to/pi-memory
 - `extract.model` 也是召回选择用的模型，默认 `opencode-go/deepseek-v4.1-flash`；换成任意 `<provider>/<model-id>` 都行，前提是能稳定输出 JSON。留空字符串会退回当前会话模型（费用按主模型算）。
 - `prompt.maxIndexBytes` 决定目录的常驻体积。目录越大，记忆越不容易被漏掉，但每次会话要多付这部分 token（目录不变时走缓存）。超出上限时目录末尾会注明「M 条中的 N 条」，其余靠 `memory_search`。
 - `extract.minIntervalMs`、`maxNewPerRun` 是费用闸门：同一进程内间隔太短不跑，一轮最多写几条。
+- `consolidate.minIntervalMs` 是真实时间，不是会话时间：上次整理的时间戳存在 `<agent dir>/memory-state.json`（默认 `~/.pi/agent/memory-state.json`），所以「每天最多一次」跨会话成立；这个文件是扩展自己写的，不用手改。手动 `/memory consolidate` 不受间隔限制，跑完同样会刷新时间戳。
 - `recall.minPromptChars` 让「继续」「ok」这类短消息不触发召回。
+- `consolidate.timeoutMs` 与 `consolidate.maxTokens` 是合并那次调用的预算（默认 4 分钟 / 12000 token）。两个都不能小：deepseek-v4.1-flash 这类带思考的模型会先把输出预算花在 reasoning 上——227 条记忆的 prompt 下，maxTokens=2000 时它给了 2000 个 reasoning token、0 个字符的正文，`/memory consolidate` 只能报 `only reasoning came back`；抬到 12000 才装得下 reasoning 加合并计划。预算不够时错误会直接说清是超时还是被思考吃掉了。`PI_MEMORY_DEBUG=1` 还会打出条目数、prompt 字符数和耗时。
 - `consolidate.enabled` 默认关闭。开启后条目数超过 `threshold` 且距上次整理超过 `minIntervalMs` 时，模型会把重复或过时的记忆合并；被合并的文件先备份到 `.backup/<时间戳>/`。也可以手动跑 `/memory consolidate`，执行前会列出要合并的条目。
 
 ## 费用与隐私

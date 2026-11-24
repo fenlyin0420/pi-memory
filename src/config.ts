@@ -65,6 +65,10 @@ export interface MemoryConfig {
 		minIntervalMs: number;
 		/** Model used for consolidation. Empty = `extract.model`. */
 		model: string;
+		/** Wall-clock budget for the merging call; the whole store goes into one prompt. */
+		timeoutMs: number;
+		/** Output budget. It has to cover the model's thinking as well as the JSON plan. */
+		maxTokens: number;
 	};
 }
 
@@ -109,6 +113,8 @@ export const DEFAULT_CONFIG: MemoryConfig = {
 		threshold: 30,
 		minIntervalMs: 86_400_000,
 		model: "",
+		timeoutMs: 240_000,
+		maxTokens: 12_000,
 	},
 };
 
@@ -180,6 +186,8 @@ export function mergeConfig(base: MemoryConfig, patch: ConfigPatch | undefined):
 			threshold: num(consolidate.threshold, base.consolidate.threshold, 2),
 			minIntervalMs: num(consolidate.minIntervalMs, base.consolidate.minIntervalMs),
 			model: str(consolidate.model, base.consolidate.model),
+			timeoutMs: num(consolidate.timeoutMs, base.consolidate.timeoutMs, 5_000),
+			maxTokens: num(consolidate.maxTokens, base.consolidate.maxTokens, 500),
 		},
 	};
 }

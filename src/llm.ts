@@ -34,6 +34,16 @@ export interface CompletionOutcome {
 	error?: string;
 }
 
+/** `Request was aborted` tells the caller nothing; when our own budget fired, say that instead. */
+function timeoutMessage(timeoutMs: number, elapsedMs: number): string {
+	return `timed out after ${(elapsedMs / 1000).toFixed(1)}s (timeoutMs=${timeoutMs})`;
+}
+
+function describeFailure(error: unknown, signal: AbortSignal, request: CompletionRequest, elapsedMs: number): string {
+	const message = error instanceof Error ? error.message : String(error);
+	return signal.aborted && /abort/i.test(message) ? timeoutMessage(request.timeoutMs, elapsedMs) : message;
+}
+
 export function resolveModel(ctx: ExtensionContext, modelRef: string): Model<Api> | undefined {
 	const ref = parseModelRef(modelRef);
 	if (!ref) return undefined;
@@ -50,6 +60,8 @@ export async function complete(
 	if (!model) return { error: `model not available: ${modelRef}` };
 
 	let message: Awaited<ReturnType<typeof ctx.modelRegistry.complete>>;
+	const signal = AbortSignal.timeout(request.timeoutMs);
+	const startedAt = Date.now();
 	try {
 		message = await ctx.modelRegistry.complete(
 			model,
@@ -66,15 +78,21 @@ export async function complete(
 				// join the conversation's thread: doing so drops the prefix the real turn continues
 				// from, so every turn after a memory call resends the full prompt.
 				disableContinuation: true,
-				signal: AbortSignal.timeout(request.timeoutMs),
+				// Side queries are serialized with the run they belong to: an already-known slow prompt
+				// has to fail with a reason that names the budget, not with the provider's generic abort.
+				signal,
 			},
 		);
 	} catch (error) {
-		return { error: error instanceof Error ? error.message : String(error) };
+		return { error: describeFailure(error, signal, request, Date.now() - startedAt) };
 	}
 
 	if (message.stopReason === "error" || message.stopReason === "aborted") {
-		return { error: message.errorMessage ?? `request ${message.stopReason}` };
+		return {
+			error: signal.aborted
+				? timeoutMessage(request.timeoutMs, Date.now() - startedAt)
+				: (message.errorMessage ?? `request ${message.stopReason}`),
+		};
 	}
 
 	const text = message.content
@@ -82,7 +100,19 @@ export async function complete(
 		.map((part) => part.text)
 		.join("")
 		.trim();
-	return text ? { text } : { error: "empty response" };
+	if (text) return { text };
+
+	// A reasoning model can spend the entire output budget thinking and never reach an answer.
+	// Measured on opencode-go/deepseek-v4.1-flash: a 227-entry consolidation prompt returned one
+	// thinking block and 0 characters of text under maxTokens=2000. Say that, instead of leaving
+	// the caller to read "empty response" as "the model had nothing to add".
+	const detail = `stopReason=${message.stopReason}, maxTokens=${request.maxTokens}`;
+	const onlyReasoning = message.content.some((part) => part.type === "thinking");
+	return {
+		error: onlyReasoning
+			? `only reasoning came back (${detail}); raise maxTokens so the answer fits`
+			: `empty response (${detail})`,
+	};
 }
 
 /** A value produced by `JSON.parse`, narrowed for callers that validate the fields they need. */

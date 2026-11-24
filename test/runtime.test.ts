@@ -251,3 +251,52 @@ describe("project scope", () => {
 		expect(existsSync(join(root, "global"))).toBe(false);
 	});
 });
+
+describe("consolidation", () => {
+	it("persists the run time so the interval survives the session", () => {
+		const { runtime, ctx } = setup();
+		runtime.save({ name: "tabs", description: "用户用 tab 缩进", type: "user", body: "用 tab。" });
+		runtime.save({ name: "indent", description: "缩进偏好是四格", type: "user", body: "缩进四格。" });
+
+		const result = runtime.applyConsolidation({
+			items: [
+				{
+					name: "indentation",
+					description: "缩进用 tab，四格",
+					type: "user",
+					body: "用 tab，四格。",
+					scope: "global",
+					replaces: ["tabs.md", "indent.md"],
+				},
+			],
+		});
+		expect(result.written).toEqual(["indentation.md"]);
+		expect(result.removed.sort()).toEqual(["indent.md", "tabs.md"]);
+		expect(runtime.lastConsolidateIso()).toBeTypeOf("string");
+
+		const nextSession = new MemoryRuntime();
+		nextSession.init(ctx);
+		expect(nextSession.lastConsolidateAt).toBe(runtime.lastConsolidateAt);
+		expect(nextSession.lastConsolidateIso()).toBe(runtime.lastConsolidateIso());
+	});
+
+	it("starts from zero when nothing was ever recorded", () => {
+		const { runtime } = setup();
+		expect(runtime.lastConsolidateAt).toBe(0);
+		expect(runtime.lastConsolidateIso()).toBeUndefined();
+	});
+
+	it("marks a failed merging call instead of claiming there was nothing to merge", async () => {
+		const { runtime } = setup({ consolidate: { threshold: 2, timeoutMs: 5_000 } });
+		runtime.save({ name: "tabs", description: "用户用 tab 缩进", type: "user", body: "用 tab。" });
+		runtime.save({ name: "indent", description: "缩进偏四格", type: "user", body: "缩进四格。" });
+
+		const context = fakeContext({ cwd: ".", reply: "" });
+		const plan = await runtime.planConsolidation(context.ctx);
+
+		expect(plan.items).toEqual([]);
+		expect(plan.failed).toBe(true);
+		expect(plan.reason).toMatch(/^empty response \(stopReason=/);
+		expect(runtime.lastConsolidateAt).toBe(0);
+	});
+});

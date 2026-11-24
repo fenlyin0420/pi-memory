@@ -28,6 +28,7 @@ import {
 } from "./memory.ts";
 import type { CatalogScope } from "./prompt.ts";
 import { selectRelevant } from "./select.ts";
+import { readState, writeState } from "./state.ts";
 
 export interface SaveOptions {
 	scope?: ScopeName;
@@ -55,10 +56,13 @@ export interface ConsolidatePlanItem extends MemoryDraft {
 export interface ConsolidatePlan {
 	items: ConsolidatePlanItem[];
 	reason?: string;
+	/** The merging call failed (timeout, provider error, unparseable reply), so nothing ran. */
+	failed?: boolean;
 }
 
-/** Walk up from `cwd` looking for a repository root. */
-export function findProjectRoot(cwd: string): string | undefined {
+/** Walk up from `cwd` looking for a repository root. */ export function findProjectRoot(
+	cwd: string,
+): string | undefined {
 	let dir = cwd;
 	for (;;) {
 		if (existsSync(join(dir, ".git"))) return dir;
@@ -67,6 +71,16 @@ export function findProjectRoot(cwd: string): string | undefined {
 		dir = parent;
 	}
 }
+
+/**
+ * How much of each memory body goes into the merging prompt.
+ *
+ * Measured on the 227-entry store this ships with: bodies at 400 characters produced a 109k
+ * character prompt (49k input tokens) and the model spent ~11.5k tokens thinking about it.
+ * The body is only there to judge whether two memories state the same fact, and the name plus
+ * description already carry that; the tail mostly repeats the detail.
+ */
+const BODY_CHARS = 160;
 
 function displayPath(dir: string, cwd: string): string {
 	const home = homedir();
@@ -90,6 +104,7 @@ export class MemoryRuntime {
 	private signature = "";
 	private extractingSince = 0;
 	lastExtractAt = 0;
+	/** Epoch ms of the last applied consolidation. Persisted, so the interval spans sessions. */
 	lastConsolidateAt = 0;
 
 	init(ctx: ExtensionContext): void {
@@ -98,6 +113,7 @@ export class MemoryRuntime {
 		this.config = loaded.config;
 		this.warnings = loaded.warnings;
 		this.configFiles = loaded.files;
+		this.lastConsolidateAt = readState().lastConsolidateAt;
 
 		this.globalScope = { name: "global", dir: this.config.store.global };
 		this.projectRoot = findProjectRoot(ctx.cwd);
@@ -308,9 +324,10 @@ export class MemoryRuntime {
 		const catalog = this.entries
 			.map(
 				(entry) =>
-					`- ${entry.filename} (${entry.scope}, ${entry.type}) ${entry.name}: ${entry.description}\n  ${entry.body.slice(0, 400)}`,
+					`- ${entry.filename} (${entry.scope}, ${entry.type}) ${entry.name}: ${entry.description}\n  ${entry.body.slice(0, BODY_CHARS)}`,
 			)
 			.join("\n");
+		const startedAt = Date.now();
 
 		const user = [
 			"Stored memories:",
@@ -325,14 +342,17 @@ export class MemoryRuntime {
 		const outcome = await complete(ctx, this.config.consolidate.model || this.config.extract.model, {
 			system: "You deduplicate a long-term memory store. Reply with JSON only.",
 			user,
-			maxTokens: 2_000,
-			timeoutMs: 45_000,
+			maxTokens: this.config.consolidate.maxTokens,
+			timeoutMs: this.config.consolidate.timeoutMs,
 		});
-		if (!outcome.text) return { items: [], reason: outcome.error };
+		debug(
+			`consolidate: ${this.entries.length} entries, ${user.length} chars, ${Date.now() - startedAt}ms -> ${outcome.error ?? "reply"}`,
+		);
+		if (!outcome.text) return { items: [], reason: outcome.error, failed: true };
 
 		const parsed = parseJsonReply(outcome.text);
 		const memories = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed.memories : undefined;
-		if (!Array.isArray(memories)) return { items: [], reason: "unparseable reply" };
+		if (!Array.isArray(memories)) return { items: [], reason: "unparseable reply", failed: true };
 
 		const known = new Map(this.entries.map((entry) => [entry.filename, entry]));
 		const items: ConsolidatePlanItem[] = [];
@@ -395,12 +415,18 @@ export class MemoryRuntime {
 		}
 
 		this.lastConsolidateAt = Date.now();
+		writeState({ lastConsolidateAt: this.lastConsolidateAt });
 		this.refresh(true);
 		return { written, removed };
 	}
 
 	total(): number {
 		return this.entries.length;
+	}
+
+	/** ISO time of the last applied consolidation, `undefined` when it never ran. */
+	lastConsolidateIso(): string | undefined {
+		return this.lastConsolidateAt > 0 ? new Date(this.lastConsolidateAt).toISOString() : undefined;
 	}
 
 	statusText(): string {

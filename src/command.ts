@@ -85,6 +85,7 @@ export function registerMemoryCommand(pi: ExtensionAPI, runtime: MemoryRuntime):
 						lines.push(`${dir.scope}: ${dir.count} memories in ${dir.dir}`);
 					}
 					lines.push(`config: ${runtime.configFiles.join(", ") || "defaults"}`);
+					lines.push(`last consolidate: ${runtime.lastConsolidateIso() ?? "never"}`);
 					for (const warning of runtime.warnings) lines.push(`warning: ${warning}`);
 					report(ctx, pi, "memory", lines);
 					return;
@@ -189,8 +190,12 @@ export function registerMemoryCommand(pi: ExtensionAPI, runtime: MemoryRuntime):
 					const plan = await runtime.planConsolidation(ctx);
 					if (plan.items.length === 0) {
 						ctx.ui.notify(
-							plan.reason ? `Nothing to consolidate: ${plan.reason}` : "Nothing to consolidate.",
-							"info",
+							plan.failed
+								? `Consolidation did not run: ${plan.reason}`
+								: plan.reason
+									? `Nothing to consolidate: ${plan.reason}`
+									: "Nothing to consolidate.",
+							plan.failed ? "warning" : "info",
 						);
 						return;
 					}
