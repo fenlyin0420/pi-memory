@@ -1,0 +1,4 @@
+# Normalize line endings: LF in the repository and in the working tree.
+# Keeps the checkout stable on Windows so an editor saving LF does not leave
+# "modified" entries whose blob is byte-identical (stale stat cache only).
+* text=auto eol=lf
